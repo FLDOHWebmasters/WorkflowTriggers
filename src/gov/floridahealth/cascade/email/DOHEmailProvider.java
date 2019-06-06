@@ -1,6 +1,6 @@
 /**
- * This code was taken from the Tri-C Github page and added here.
- * Modifications made to handle our own specific system. 
+ * Constructs the outgoing email utilizing Velocity formats to convert the original variables into HTML and then 
+ * uses the Email Service to send to the intended recipients 
  */
 package gov.floridahealth.cascade.email;
 
@@ -15,11 +15,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
-
 import org.apache.log4j.Logger;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
-
 import com.cms.workflow.FatalTriggerProviderException;
 import com.cms.workflow.TriggerProviderException;
 import com.cms.workflow.function.EmailProvider;
@@ -50,11 +48,21 @@ import gov.floridahealth.cascade.properties.CascadeCustomProperties;
 public class DOHEmailProvider extends EmailProvider {
 
 	private static final Logger LOG = Logger.getLogger(DOHEmailProvider.class);
-    private static final String MODE_PARAM = "mode";
+    /* Incoming Parameters */
+	private static final String MODE_PARAM = "mode";
     private static final String MODE_BRANDING = "branding";
+    
+    /* 
+     * Original Location of the Velocity Formats; Removed from JAR due to desire to update Email Templates without
+     * having to deploy the JAR file again.
+     */
     private static final String TEMPLATE_LOCATION = "gov.floridahealth.cascade.email.templates";
     private static final String TEMPLATE_EXTENSION = "vm";
+    
+    /* Cascade Velocity Properties File - Not Editable */
     private static final String VELOCITY_PROPERTIES_FILE_NAME = "velocity.properties";
+    
+    /* Values within the Workflow that need to be part of the various emails sent */
     private static final String TEMPLATE_VARIABLE_WORKFLOW_NAME = "_workflowName";
 	private static final String TEMPLATE_VARIABLE_ENTITY_TYPE = "_entityType";
     private static final String TEMPLATE_VARIABLE_ENTITY_URL = "_entityUrl";
@@ -75,23 +83,24 @@ public class DOHEmailProvider extends EmailProvider {
     private static final String TEMPLATE_VARIABLE_CURRENT_STEP = "_currentStep";
     private static final String TEMPLATE_VARIABLE_HISTORY_COMMENTS = "_historyComments";
    
-
-    //PROPERTY File Items
-    private static final String SITE_PREFIX_PROP = "site.prefix";                 // added Version 1.6
+    /* Property File Items */
+    private static final String SITE_PREFIX_PROP = "site.prefix";
     private static final String TEMPLATE_SITE_PROP = "email.template.site";
     private static final String TEMPLATE_PATH_PROP = "email.template.path";
     private static final String TEMPLATE_CSS_PATH_PROP = "email.template.css.path";
     private static final String TEMPLATE_CSS_FILE_PROP = "email.template.css.file";
     
-    
 /**
- * Main Process Function - Requirement of all Triggers for Cascade
- * @Override    
+ * Main Process Function - Requirement of all Triggers for Cascade 
  */
+    @Override
     public boolean process() throws TriggerProviderException  {
-        // Mode contains the name of the Velocity file to use for the email    	
+        /* Mode contains the name of the Velocity file to use for the email */    	
     	String mode = parameters.get(MODE_PARAM);
-    	//Branding... I have
+    	/* 
+    	 * Branding - Originally, there was a requirement that the workflow could utilize a different CSS file depending
+    	 * upon the template.  This was nixed, but parameter and commented out code remains.
+    	 */ 
     	String branding = parameters.get(MODE_BRANDING);
     	
     	//Properties file defined by Cascade for Velocity
@@ -105,7 +114,7 @@ public class DOHEmailProvider extends EmailProvider {
         }
         VelocityEngine ve = new VelocityEngine(props);
         
-        //Properties for the class
+        //Properties for the class taken from /resources/config.properties
         Properties cascadeProps;
         try {
         	cascadeProps = CascadeCustomProperties.getProperties();
@@ -141,6 +150,7 @@ public class DOHEmailProvider extends EmailProvider {
         	counter++;
         }
         
+        // The ID and Type of the Asset that the workflow is being used to CRUD/Move
         String relatedEntityId = commonWorkflow.getRelatedEntityId();
         String relatedEntityType = commonWorkflow.getRelatedEntityType();
         String hostPrefix;
@@ -209,7 +219,6 @@ public class DOHEmailProvider extends EmailProvider {
         vc.put(TEMPLATE_VARIABLE_HISTORY_COMMENTS, historyComments);
         
         String body;
-        LOG.info("Write Email");
         try (StringWriter stream = new StringWriter()) { // added try with resource in version 1.7
             if (template == null) {
                 if (!ve.mergeTemplate(templateName, "UTF-8", vc, stream)) {
@@ -258,14 +267,29 @@ public class DOHEmailProvider extends EmailProvider {
         return true;
     }
 
+    /**
+     * Retrieves the entity that is currently in possession of the workflow 
+     * @param commonWorkflow Workflow Object controlling the asset
+     * @return User ID or Group ID
+     */
     private String getCurrentStepOwner(Workflow commonWorkflow) {
         return getStepOwner(commonWorkflow.getCurrentStep());
     }
 
+    /**
+     * Retrieves the entity that will receive the workflow via the next step
+     * @param commonWorkflow Workflow Object controlling the asset
+     * @return User ID or Group ID
+     */
     private String getApprover(Workflow commonWorkflow) {
         return getStepOwner(commonWorkflow.getCurrentStep().getPreviousStep());
     }
 
+    /**
+     * Gets the owner of a past step (used in conjunction with Workflow History)
+     * @param step Step of the Workflow in question
+     * @return User ID or Group ID
+     */
     private String getStepOwner(WorkflowStep step) {
         if (step == null) {
             LOG.debug("getStepOwner: step is null");
@@ -288,6 +312,11 @@ public class DOHEmailProvider extends EmailProvider {
         }
     }
 
+    /**
+     * Returns the User who initiated the workflow
+     * @param commonWorkflow Workflow Object controlling the asset
+     * @return User ID
+     */
     private String getWorkflowOwner(Workflow commonWorkflow){
         UserService userService = this.serviceProvider.getUserService();
         String ownerId = commonWorkflow.getOwner();
@@ -309,17 +338,23 @@ public class DOHEmailProvider extends EmailProvider {
     }
 
 
-    // added in version 1.6
 
+/**
+ * Obtains the Template in one of 3 ways:
+ * 1) site://sitename/folder/folder/file NOTE: folders are optional
+ * 2) /folder/file NOTE: the site of the document associated with the workflow will be used
+ * 3) filename NOTE: the site of the document associated with the workflow will be used and the path 
+ *    will be the value of DEFAULT_TEMPLATE_FILE_FOLDER
+ *    Nore: If the file is not found and it has no extension then the default extension will be added
+ *    and retried.  
+ * @param path - Path to the file
+ * @param defaultSiteId - Site ID of the Workflow
+ * @param prefix - Beginning of the path in the case that the value is referring across sites
+ * @param defaultFolder - Default Folder to check if Path does not contain any folder structure
+ * @return Text of the Template File or null upon failure
+ */
     private String GetTemplateFromFile(String path, String defaultSiteId, String prefix, String defaultFolder) {
-        // path can take one of three forms
-        // 1) site://sitename/folder/folder/file NOTE: folders are optional
-        // 2) /folder/file NOTE: the site of the document associated with the workflow will be used
-        // 3) filename NOTE: the site of the document associated with the workflow will be used and
-        //      the path will be the value of DEFAULT_TEMPLATE_FILE_FOLDER
-        // returns null if anything goes wrong
-        // if the file is not found and it has no extension then the default extension will be added
-        // and retried
+        // 
         File templateFile;
         if (PathHasSite(path,prefix)) {
             String siteId;
@@ -357,7 +392,13 @@ public class DOHEmailProvider extends EmailProvider {
         return templateFile.getText();
     }
 
-    // extract the site name and path from site://sitename/folder/folder/file NOTE: folders are optional
+    /**
+     * Extracts the site name and path from site://sitename/folder/folder/file
+     * NOTE: folders are optional
+     * @param input - Path to be parsed
+     * @param prefix - Site Prefix
+     * @return Object holding the Site name and path
+     */
     private SiteNamePath ParsePath(String input, String prefix) {
         if (!PathHasSite(input,prefix)) {
             LOG.warn(String.format("Path not valid: %s", input));
@@ -378,6 +419,9 @@ public class DOHEmailProvider extends EmailProvider {
         return new SiteNamePath(sitePath.substring(0, pos), sitePath.substring(pathStart));
     }
 
+    /**
+     * Basic object for Site Name and Path
+     */
     private class SiteNamePath {
         private String SiteName;
         private String Path;
@@ -400,6 +444,11 @@ public class DOHEmailProvider extends EmailProvider {
         }
     }
 
+    /**
+     * Retrieves the ID of the site based upon the name
+     * @param siteName Name of the Site used to get the ID
+     * @return Site ID
+     */
     private String GetSiteId(String siteName) {
         if (siteName == null || siteName.length() == 0) {
             LOG.error("siteName is null or empty");
@@ -423,6 +472,12 @@ public class DOHEmailProvider extends EmailProvider {
         return templateFile;
     }
     
+    /**
+     * Retrieves the file based upon the parameters
+     * @param siteId Site ID
+     * @param path Path
+     * @return File Object if exists, null if not
+     */
     private File GetFile(String siteId, String path) {
         FolderContainedEntity fce = this.serviceProvider.getLocatorService().locateFolderContainedEntity(
                 path, EntityTypes.TYPE_FILE, siteId);
@@ -431,31 +486,33 @@ public class DOHEmailProvider extends EmailProvider {
         }
         return (File) APIAdapterFactory.createAPIAdapter(fce, true, false, this.serviceProvider);
     }
-
-    /*
-     * Commenting out to remove the warning for the short term
-    private String GetSiteIdFromAsset(String assetId) {
-        FolderContainedEntity fce = this.serviceProvider.getLocatorService().locateFolderContainedEntity(assetId);
-        if (fce == null) {
-            LOG.error(String.format("Asset could not be found, ID: %s", assetId));
-            return null;
-        }
-        return SiteUtil.getSiteId(fce);
-    }
-	*/
     
+    /**
+     * Checks to see if the string has any reference to the site by way of the path
+     * @param path - Path of the object
+     * @param prefix - Site Prefix to check
+     * @return true if Site Prefix exists, false if not
+     */
     private Boolean PathHasSite(String path, String prefix) {
         return path.toUpperCase().startsWith(prefix);
     }
 
+    /**
+     * Determines if this only the file or has additional information
+     * @param path - Path of the  
+     * @param prefix - prefix to compare if the path starts with the site style
+     * @return True if just a file, False if any path information whatsoever.
+     */
     private Boolean IsSimpleName(String path, String prefix) {
         return !PathHasSite(path,prefix) && path.indexOf('/') == -1;
     }
-    // end added in Version 1.6
 
-
-    public static Properties getProperties()
-            throws IOException
+    /**
+     * Returns the properties object
+     * @return Properties of Velocity as dictated by Cascade/Hannon Hill
+     * @throws IOException Error if the file can not be found.
+     */
+    public static Properties getProperties() throws IOException
     {
         Properties props = new Properties();
         try (InputStream stream = ClassUtil.relativeInputStream(DOHEmailProvider.class, VELOCITY_PROPERTIES_FILE_NAME)){
@@ -464,6 +521,12 @@ public class DOHEmailProvider extends EmailProvider {
         return props;
     }
 
+    /**
+     * Determines who should receive the email in question, based upon the most recent step completed.
+     * @param context Information from the workflow necessary for delivering the email
+     * @return Collection of Recipients to get the email 
+     * @throws TriggerProviderException Error that shuts down the trigger within the workflow
+     */
     private Set<RecipientInfo> Recipients(VelocityContext context) throws TriggerProviderException {
         Set<RecipientInfo> recipients = new HashSet<>();
         GroupService groupService = this.serviceProvider.getGroupService();
@@ -560,6 +623,9 @@ public class DOHEmailProvider extends EmailProvider {
         return recipients;
     }
 
+    /**
+     * Basic class for storing information of the recipient(s)
+     */
     public class RecipientInfo
     {
         private String username;
