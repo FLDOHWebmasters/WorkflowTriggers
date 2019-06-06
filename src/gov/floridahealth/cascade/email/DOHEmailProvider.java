@@ -45,6 +45,8 @@ import com.hannonhill.cascade.model.workflow.adapter.PublicWorkflowAdapter;
 import com.hannonhill.commons.util.ClassUtil;
 import com.hannonhill.commons.util.StringUtil;
 
+import gov.floridahealth.cascade.properties.CascadeCustomProperties;
+
 public class DOHEmailProvider extends EmailProvider {
 
 	private static final Logger LOG = Logger.getLogger(DOHEmailProvider.class);
@@ -72,24 +74,28 @@ public class DOHEmailProvider extends EmailProvider {
     private static final String TEMPLATE_VARIABLE_START_DATE ="_startDate";
     private static final String TEMPLATE_VARIABLE_CURRENT_STEP = "_currentStep";
     private static final String TEMPLATE_VARIABLE_HISTORY_COMMENTS = "_historyComments";
-    
-    private static final String PATH_PREFIX = "SITE://";                 // added Version 1.6
-    private static final int PATH_PREFIX_LENGTH = PATH_PREFIX.length();  // added Version 1.6
-    private static final String DEFAULT_TEMPLATE_FILE_FOLDER = "_internal/formats/email/";
-    private static final String DEFAULT_TEMPLATE_CSS_FOLDER = "_internal/formats/email/css/";
-    private static final String DEFAULT_CSS_FILE = "default.css";
+   
 
-    /**
-     * Main 
-     */
-    @Override    
+    //PROPERTY File Items
+    private static final String SITE_PREFIX_PROP = "site.prefix";                 // added Version 1.6
+    private static final String TEMPLATE_SITE_PROP = "email.template.site";
+    private static final String TEMPLATE_PATH_PROP = "email.template.path";
+    private static final String TEMPLATE_CSS_PATH_PROP = "email.template.css.path";
+    private static final String TEMPLATE_CSS_FILE_PROP = "email.template.css.file";
+    
+    
+/**
+ * Main Process Function - Requirement of all Triggers for Cascade
+ * @Override    
+ */
     public boolean process() throws TriggerProviderException  {
-        // mode has template name to use for email
-    	LOG.info("Starting Process for Delete");
+        // Mode contains the name of the Velocity file to use for the email    	
     	String mode = parameters.get(MODE_PARAM);
+    	//Branding... I have
     	String branding = parameters.get(MODE_BRANDING);
     	
-        Properties props;
+    	//Properties file defined by Cascade for Velocity
+    	Properties props;
         try {
             props = getProperties();
         } catch (IOException e) {
@@ -98,8 +104,18 @@ public class DOHEmailProvider extends EmailProvider {
             throw new FatalTriggerProviderException(err, e);
         }
         VelocityEngine ve = new VelocityEngine(props);
-        LOG.info("Velocity Engine");
-        // get info for template variables
+        
+        //Properties for the class
+        Properties cascadeProps;
+        try {
+        	cascadeProps = CascadeCustomProperties.getProperties();
+        } catch (IOException e) {
+            String err = "Could not load velocity properties";
+            LOG.fatal(err, e);
+            throw new FatalTriggerProviderException(err, e);
+        }         
+
+        // Information for the template variables is pulled from the Workflow
         Workflow commonWorkflow;
         try {
             commonWorkflow = ((PublicWorkflowAdapter)this.workflow).getWorkflow();
@@ -110,8 +126,8 @@ public class DOHEmailProvider extends EmailProvider {
         }
         String systemURL = serviceProvider.getPreferencesService().getSystemURL();
         
-
-        ArrayList<ArrayList> historyComments = new ArrayList<ArrayList>();
+        //Get the list of comments entered by the Web Manager and the Web Team from the Workflow 
+        ArrayList<ArrayList<String>> historyComments = new ArrayList<ArrayList<String>>();
         WorkflowHistory cwHistory = commonWorkflow.getHistory();
         int counter = 0; 
         while(cwHistory != null && counter < 100) {
@@ -124,7 +140,7 @@ public class DOHEmailProvider extends EmailProvider {
         	cwHistory = cwHistory.getNextHistory();
         	counter++;
         }
-        LOG.info("Entity ID and Type");
+        
         String relatedEntityId = commonWorkflow.getRelatedEntityId();
         String relatedEntityType = commonWorkflow.getRelatedEntityType();
         String hostPrefix;
@@ -141,22 +157,23 @@ public class DOHEmailProvider extends EmailProvider {
         if (systemURL == null) {
             systemURL = "";
         }
-        LOG.info("Get Template");
-        String urlPrefix = String.format("%s%s/entity/open.act?id=", hostPrefix, ContextPathBean.CONTEXT_PATH);
-        
+        String urlPrefix = String.format("%s%s/entity/open.act?id=", hostPrefix, ContextPathBean.CONTEXT_PATH);        
         String templateName = String.format("%s/%s.%s", TEMPLATE_LOCATION, mode.toLowerCase(), TEMPLATE_EXTENSION);
-        //String template = GetTemplateFromFile(mode, GetSiteIdFromAsset(relatedEntityId));
-        String chdRepSiteId = GetSiteId("CHD_Repository");
-        String template = GetTemplateFromFile(mode, chdRepSiteId);
+        String chdRepSiteId = GetSiteId(cascadeProps.getProperty(TEMPLATE_SITE_PROP));
+        String prefix = cascadeProps.getProperty(SITE_PREFIX_PROP);
+        String defaultFolder = cascadeProps.getProperty(TEMPLATE_PATH_PROP);
+        String template = GetTemplateFromFile(mode, chdRepSiteId, prefix, defaultFolder);
         if (branding != null && branding != "") {
         	//Load the CSS file specified
         	//String emailStyle = TryGetFile(chdRepSiteId, String.format("%s%s", DEFAULT_TEMPLATE_FILE_FOLDER, DEFAULT_CSS_FILE)).getText();
         }
         //Load the default css
-        String emailStyle = TryGetFile(chdRepSiteId, String.format("%s%s", DEFAULT_TEMPLATE_CSS_FOLDER, DEFAULT_CSS_FILE)).getText();
+        String emailStyle = TryGetFile(chdRepSiteId, String.format("%s%s", 
+        		cascadeProps.getProperty(TEMPLATE_CSS_PATH_PROP), 
+        		cascadeProps.getProperty(TEMPLATE_CSS_FILE_PROP))).getText();
                 
         if (template == null) {
-            if (IsSimpleName(mode)) {
+            if (IsSimpleName(mode, prefix)) {
                 if (!ve.resourceExists(templateName)) {
                     String err = String.format("Default template not found: %s", mode);
                     LOG.fatal(err);
@@ -294,7 +311,7 @@ public class DOHEmailProvider extends EmailProvider {
 
     // added in version 1.6
 
-    private String GetTemplateFromFile(String path, String defaultSiteId) {
+    private String GetTemplateFromFile(String path, String defaultSiteId, String prefix, String defaultFolder) {
         // path can take one of three forms
         // 1) site://sitename/folder/folder/file NOTE: folders are optional
         // 2) /folder/file NOTE: the site of the document associated with the workflow will be used
@@ -304,9 +321,9 @@ public class DOHEmailProvider extends EmailProvider {
         // if the file is not found and it has no extension then the default extension will be added
         // and retried
         File templateFile;
-        if (PathHasSite(path)) {
+        if (PathHasSite(path,prefix)) {
             String siteId;
-            SiteNamePath siteNamePath = ParsePath(path);
+            SiteNamePath siteNamePath = ParsePath(path,prefix);
             if (siteNamePath == null) {
                 return null;
             }
@@ -331,7 +348,7 @@ public class DOHEmailProvider extends EmailProvider {
                 LOG.warn("Default SiteId is null or blank");
                 return null;
             }
-            templateFile = TryGetFile(defaultSiteId, String.format("%s%s", DEFAULT_TEMPLATE_FILE_FOLDER, path));
+            templateFile = TryGetFile(defaultSiteId, String.format("%s%s", defaultFolder, path));
         }
         if (templateFile == null) {
             LOG.warn(String.format("File not found %s", path));
@@ -341,12 +358,12 @@ public class DOHEmailProvider extends EmailProvider {
     }
 
     // extract the site name and path from site://sitename/folder/folder/file NOTE: folders are optional
-    private SiteNamePath ParsePath(String input) {
-        if (!PathHasSite(input)) {
+    private SiteNamePath ParsePath(String input, String prefix) {
+        if (!PathHasSite(input,prefix)) {
             LOG.warn(String.format("Path not valid: %s", input));
             return null;
         }
-        String sitePath = input.substring(PATH_PREFIX_LENGTH);
+        String sitePath = input.substring(prefix.length());
         int pos = sitePath.indexOf('/');
         if (pos < 1) {
             LOG.warn(String.format("Site Name missing from: %s", sitePath));
@@ -427,12 +444,12 @@ public class DOHEmailProvider extends EmailProvider {
     }
 	*/
     
-    private Boolean PathHasSite(String path) {
-        return path.toUpperCase().startsWith(PATH_PREFIX);
+    private Boolean PathHasSite(String path, String prefix) {
+        return path.toUpperCase().startsWith(prefix);
     }
 
-    private Boolean IsSimpleName(String path) {
-        return !PathHasSite(path) && path.indexOf('/') == -1;
+    private Boolean IsSimpleName(String path, String prefix) {
+        return !PathHasSite(path,prefix) && path.indexOf('/') == -1;
     }
     // end added in Version 1.6
 

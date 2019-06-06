@@ -1,5 +1,8 @@
 package gov.floridahealth.cascade.publisher;
 
+import java.io.IOException;
+import java.util.Properties;
+
 import org.apache.log4j.Logger;
 
 import com.cms.workflow.FatalTriggerProviderException;
@@ -15,16 +18,33 @@ import com.hannonhill.cascade.model.service.PublishService;
 import com.hannonhill.cascade.model.util.SiteUtil;
 import com.hannonhill.cascade.model.workflow.adapter.PublicWorkflowAdapter;
 
+import gov.floridahealth.cascade.properties.CascadeCustomProperties;
+
 public class FolderPublisher
   extends Publisher
 {
   private static final Logger LOG = Logger.getLogger(FolderPublisher.class);
-  private static final String JSON_LOCATION = "_files/json";
+  private static final String JSON_LOCATION_PROP = "json.defaultFolder";
   
+  /**
+   * 
+   * @return boolean Successful Completion of Folder publish 
+   */
   public boolean process()
     throws TriggerProviderException
   {
-    String folderLocation = getParameter("folder");
+	 Properties cascadeProperties = null;
+	 String jsonLocation = null;
+	  try {
+    	cascadeProperties = CascadeCustomProperties.getProperties();
+    } catch (IOException ioe) {
+    	throw new TriggerProviderException(ioe.getMessage());
+    }
+    if (cascadeProperties != null ) {
+    	jsonLocation = cascadeProperties.getProperty(JSON_LOCATION_PROP);
+    }
+	  
+	String folderLocation = getParameter("folder");
     String siteName = getParameter("site");
     Workflow commonWorkflow;
     try
@@ -54,10 +74,12 @@ public class FolderPublisher
         path = folderLocation;
         fce = TryGetFolder(siteId, path);
       }
-      else
+      else if (jsonLocation != null) 
       {
-        path = JSON_LOCATION;
+        path = jsonLocation;
         fce = TryGetFolder(siteId, path);
+      } else {
+    	  return false;
       }
       Folder folder = (Folder)fce;
       

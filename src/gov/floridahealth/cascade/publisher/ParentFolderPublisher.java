@@ -1,6 +1,9 @@
 
 package gov.floridahealth.cascade.publisher;
 
+import java.io.IOException;
+import java.util.Properties;
+
 import org.apache.log4j.Logger;
 
 import com.cms.workflow.FatalTriggerProviderException;
@@ -15,16 +18,38 @@ import com.hannonhill.cascade.model.service.PublishService;
 import com.hannonhill.cascade.model.util.SiteUtil;
 import com.hannonhill.cascade.model.workflow.adapter.PublicWorkflowAdapter;
 
+import gov.floridahealth.cascade.properties.CascadeCustomProperties;
+
+/**
+ * Publishes an ancestor folder of the asset involved in a workflow.
+ * Values to use:
+ * PARENT - 1 Folder Up
+ * GRANDPARENT - 2 Folders Up
+ * GREATGRANDPARENT - 3 Folders Up
+ * @author VerschageJX 
+ */
 public class ParentFolderPublisher
 extends Publisher {
-    private static final Logger LOG = Logger.getLogger(ParentFolderPublisher.class);
-    private static final String PARENT_PARAM = "parent_type";
-
+	
+ 
+	private static final Logger LOG = Logger.getLogger(ParentFolderPublisher.class);
+    private static final String PARENT_PARAM_PROP = "parent.param.name";
+    private static final String DEFAULT_PARAM_PROP = "parent.parent.default.value";
+    
     public boolean process() throws TriggerProviderException {
-        Workflow commonWorkflow;
-        String parentType = this.getParameter(PARENT_PARAM);
+    	String parentParam = null;
+    	String defaultValue = null;
+    	try {
+    		Properties cascadeProperties = CascadeCustomProperties.getProperties();
+    		parentParam = cascadeProperties.getProperty(PARENT_PARAM_PROP);
+    		defaultValue = cascadeProperties.getProperty(DEFAULT_PARAM_PROP);
+    	} catch (IOException ioe) {
+    		throw new TriggerProviderException(ioe.getMessage());
+    	}
+    	
+    	Workflow commonWorkflow;
+        String parentType = this.getParameter(parentParam);
         String parentFolderLocation = "";
-        LOG.info((Object)("Parent Type: " + parentType));
         try {
             commonWorkflow = ((PublicWorkflowAdapter)this.workflow).getWorkflow();
         }
@@ -35,8 +60,7 @@ extends Publisher {
         }
         String relatedEntityId = commonWorkflow.getRelatedEntityId();
         String siteId = this.GetSiteIdFromAsset(relatedEntityId);
-        parentFolderLocation = parentType != null && parentType != "" ? this.GetParentFolderFromAsset(relatedEntityId, parentType) : this.GetParentFolderFromAsset(relatedEntityId, "PARENT");
-        LOG.info((Object)("Folder Path: " + parentFolderLocation));
+        parentFolderLocation = parentType != null && parentType != "" ? this.GetParentFolderFromAsset(relatedEntityId, parentType) : this.GetParentFolderFromAsset(relatedEntityId, defaultValue);
         if (siteId != null && parentFolderLocation != "") {
             String path = "";
             path = parentFolderLocation;
