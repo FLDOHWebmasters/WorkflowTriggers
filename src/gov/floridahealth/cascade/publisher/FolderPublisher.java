@@ -156,7 +156,7 @@ public class FolderPublisher extends Publisher
   
 	/**
 	 * Pulls the Site ID based upon the parameter name if passed 
-	 * @param siteName
+	 * @param siteName Name of the site containing the asset
 	 * @return Site ID
 	 */
   private String GetSiteIdFromName(String siteName)
