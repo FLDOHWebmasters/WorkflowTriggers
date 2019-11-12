@@ -1,4 +1,3 @@
-
 package gov.floridahealth.cascade.publisher;
 
 import java.io.IOException;
@@ -14,6 +13,7 @@ import com.hannonhill.cascade.model.dom.FolderContainedEntity;
 import com.hannonhill.cascade.model.dom.PublishRequest;
 import com.hannonhill.cascade.model.dom.Workflow;
 import com.hannonhill.cascade.model.dom.identifier.EntityTypes;
+import com.hannonhill.cascade.model.service.LocatorService;
 import com.hannonhill.cascade.model.service.PublishService;
 import com.hannonhill.cascade.model.util.SiteUtil;
 import com.hannonhill.cascade.model.workflow.adapter.PublicWorkflowAdapter;
@@ -30,101 +30,76 @@ import gov.floridahealth.cascade.properties.CascadeCustomProperties;
  */
 public class ParentFolderPublisher
 extends Publisher {
-	
- 
 	private static final Logger LOG = Logger.getLogger(ParentFolderPublisher.class);
     private static final String PARENT_PARAM_PROP = "parent.param.name";
     private static final String DEFAULT_PARAM_PROP = "parent.parent.default.value";
     
     public boolean process() throws TriggerProviderException {
-    	String parentParam = null;
-    	String defaultValue = null;
+    	final String parentParam, defaultValue;
     	try {
     		Properties cascadeProperties = CascadeCustomProperties.getProperties();
     		parentParam = cascadeProperties.getProperty(PARENT_PARAM_PROP);
     		defaultValue = cascadeProperties.getProperty(DEFAULT_PARAM_PROP);
     	} catch (IOException ioe) {
-    		throw new TriggerProviderException(ioe.getMessage());
+    		throw new TriggerProviderException(ioe.getMessage(), ioe);
     	}
-    	
-    	Workflow commonWorkflow;
-        String parentType = this.getParameter(parentParam);
-        String parentFolderLocation = "";
+    	final String relatedEntityId;
         try {
-            commonWorkflow = ((PublicWorkflowAdapter)this.workflow).getWorkflow();
-        }
-        catch (Throwable t) {
-            String err = String.format("Could not get commonWorkflow for workflow %s", this.workflow.getName());
-            LOG.fatal((Object)err, t);
+        	Workflow commonWorkflow = ((PublicWorkflowAdapter)this.workflow).getWorkflow();
+        	relatedEntityId = commonWorkflow.getRelatedEntityId();
+        } catch (Throwable t) {
+        	String workflowName = this.workflow == null ? "null" : this.workflow.getName();
+            String err = "Could not get commonWorkflow for workflow " + workflowName;
+            LOG.fatal(err, t);
             throw new FatalTriggerProviderException(err, t);
         }
-        String relatedEntityId = commonWorkflow.getRelatedEntityId();
-        String siteId = this.GetSiteIdFromAsset(relatedEntityId);
-        parentFolderLocation = parentType != null && parentType != "" ? this.GetParentFolderFromAsset(relatedEntityId, parentType) : this.GetParentFolderFromAsset(relatedEntityId, defaultValue);
-        if (siteId != null && parentFolderLocation != "") {
-            String path = "";
-            path = parentFolderLocation;
-            FolderContainedEntity fce = this.TryGetFolder(siteId, path);
-            Folder folder = (Folder)fce;
-            PublishRequest pubReq = new PublishRequest();
-            pubReq.setId(fce.getId());
-            pubReq.setFolder(folder);
-            pubReq.setPublishAllDestinations(true);
-            pubReq.setGenerateReport(false);
-            pubReq.setUsername("_publisher");
-            PublishService pubServ = this.serviceProvider.getPublishService();
-            try {
-                pubServ.queue(pubReq);
-            }
-            catch (Exception e) {
-                throw new TriggerProviderException(e.getLocalizedMessage());
-            }
-            return true;
-        }
-        return false;
-    }
-
-    private FolderContainedEntity TryGetFolder(String siteId, String path) {
-        FolderContainedEntity folder;
-        try {
-            LOG.info((Object)"Getting folder id");
-            folder = this.serviceProvider.getLocatorService().locateFolderContainedEntity(path, EntityTypes.TYPE_FOLDER, siteId);
-        }
-        catch (Exception e) {
-            LOG.error((Object)"Could not get the designated Folder");
-            return null;
-        }
-        return folder;
-    }
-
-    private String GetSiteIdFromAsset(String assetId) {
-        FolderContainedEntity fce = this.serviceProvider.getLocatorService().locateFolderContainedEntity(assetId);
+        LocatorService service = this.serviceProvider.getLocatorService();
+        FolderContainedEntity fce = service.locateFolderContainedEntity(relatedEntityId);
         if (fce == null) {
-            LOG.error((Object)String.format("Asset could not be found, ID: %s", assetId));
-            return null;
-        }
-        return SiteUtil.getSiteId((FolderContainedEntity)fce);
-    }
-
-    private String GetParentFolderFromAsset(String assetId, String parentType) {
-        FolderContainedEntity fce = this.serviceProvider.getLocatorService().locateFolderContainedEntity(assetId);
-        if (fce == null) {
-            LOG.error((Object)String.format("Asset could not be found, ID: %s", assetId));
-            return null;
+            return fail("Asset could not be found by ID: " + relatedEntityId);
         }
         String itemPath = fce.getPath();
-        if (parentType.equals("PARENT")) {
-            return itemPath.substring(0, itemPath.lastIndexOf(47));
+        String siteId = SiteUtil.getSiteId(fce);
+        if (siteId == null) {
+            return fail("Site ID not found for asset: " + itemPath);
         }
+        String parentType = getParameter(parentParam);
+        if (parentType == null || parentType == "") { parentType = defaultValue; }
+        String parentFolderLocation = itemPath.substring(0, itemPath.lastIndexOf('/'));
         if (parentType.equals("GRANDPARENT")) {
-            if (itemPath.lastIndexOf("/") > 1) {
-                return itemPath.substring(0, itemPath.lastIndexOf(47, itemPath.lastIndexOf("/") - 1));
-            }
-            LOG.error((Object)"Can not publish Grandparent of file in single folder");
-            return null;
+        	if (parentFolderLocation.lastIndexOf('/') < 0) {
+                return fail("Cannot publish Grandparent of file in single folder: " + itemPath);
+        	}
+            parentFolderLocation = parentFolderLocation.substring(0, parentFolderLocation.lastIndexOf('/'));
+        } else if (!parentType.equals("PARENT")) {
+            return fail("Parent type invalid: " + parentType);
         }
-        LOG.error((Object)"Parent Value not set, returning null");
-        return null;
+        if (parentFolderLocation == "") {
+            return fail("Missing " + parentType + " folder for asset: " + itemPath);
+        }
+        try {
+        	fce = service.locateFolderContainedEntity(parentFolderLocation, EntityTypes.TYPE_FOLDER, siteId);
+        } catch (Exception e) {
+            return fail("Could not get the designated folder: " + parentFolderLocation + " in site ID " + siteId);
+        }
+		PublishRequest pubReq = new PublishRequest();
+		pubReq.setId(fce.getId());
+		pubReq.setFolder((Folder)fce);
+		pubReq.setPublishAllDestinations(true);
+		pubReq.setGenerateReport(false);
+		pubReq.setUsername("_publisher");
+        PublishService pubServ = this.serviceProvider.getPublishService();
+        try {
+            pubServ.queue(pubReq);
+        } catch (Exception e) {
+            throw new TriggerProviderException(e.getLocalizedMessage(), e);
+        }
+        return true;
+    }
+
+    private boolean fail(String message) {
+    	LOG.error(message);
+    	return false;
     }
 
     public boolean triggerShouldFetchEntity() {
