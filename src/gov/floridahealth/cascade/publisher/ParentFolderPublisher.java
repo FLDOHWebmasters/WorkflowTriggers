@@ -29,28 +29,31 @@ import gov.floridahealth.cascade.properties.CascadeCustomProperties;
  */
 public class ParentFolderPublisher extends Publisher {
 	private static final Logger LOG = Logger.getLogger(ParentFolderPublisher.class);
-	private static final String PARENT_PARAM_PROP = "parent.param.name";
-	private static final String DEFAULT_PARAM_PROP = "parent.parent.default.value";
+
+	static class Config {
+		private static final String PARENT_PARAM_PROP = "parent.param.name";
+		private static final String DEFAULT_VALUE_PROP = "parent.parent.default.value";
+		final String parentParam;
+		final String defaultValue;
+		public Config() throws TriggerProviderException {
+			String parentParam = null, defaultValue = null;
+			try {
+				Properties cascadeProperties = CascadeCustomProperties.getProperties();
+				parentParam = cascadeProperties.getProperty(PARENT_PARAM_PROP);
+				defaultValue = cascadeProperties.getProperty(DEFAULT_VALUE_PROP);
+			} catch (IOException ioe) {
+				LOG.error("Could not get properties", ioe);
+				throw new TriggerProviderException(ioe.getMessage(), ioe);
+			} finally {
+				this.parentParam = parentParam;
+				this.defaultValue = defaultValue;
+			}
+		}
+	}
 
 	public boolean process() throws TriggerProviderException {
-		final String parentParam, defaultValue;
-		try {
-			Properties cascadeProperties = CascadeCustomProperties.getProperties();
-			parentParam = cascadeProperties.getProperty(PARENT_PARAM_PROP);
-			defaultValue = cascadeProperties.getProperty(DEFAULT_PARAM_PROP);
-		} catch (IOException ioe) {
-			throw new TriggerProviderException(ioe.getMessage(), ioe);
-		}
-		final String relatedEntityId;
-		try {
-			Workflow commonWorkflow = ((PublicWorkflowAdapter) this.workflow).getWorkflow();
-			relatedEntityId = commonWorkflow.getRelatedEntityId();
-		} catch (Throwable t) {
-			String workflowName = this.workflow == null ? "null" : this.workflow.getName();
-			String err = "Could not get commonWorkflow for workflow " + workflowName;
-			LOG.fatal(err, t);
-			throw new FatalTriggerProviderException(err, t);
-		}
+		final Config config = new Config();
+		final String relatedEntityId = getRelatedEntityId();
 		LocatorService service = this.serviceProvider.getLocatorService();
 		FolderContainedEntity fce = service.locateFolderContainedEntity(relatedEntityId);
 		if (fce == null) {
@@ -61,9 +64,9 @@ public class ParentFolderPublisher extends Publisher {
 		if (siteId == null) {
 			return fail("Site ID not found for asset: " + itemPath);
 		}
-		String parentType = getParameter(parentParam);
+		String parentType = getParameter(config.parentParam);
 		if (parentType == null || parentType == "") {
-			parentType = defaultValue;
+			parentType = config.defaultValue;
 		}
 		String parentFolderLocation = itemPath.substring(0, itemPath.lastIndexOf('/'));
 		if (parentType.equals("GRANDPARENT")) {
@@ -82,6 +85,30 @@ public class ParentFolderPublisher extends Publisher {
 		} catch (Exception e) {
 			return fail("Could not get the designated folder: " + parentFolderLocation + " in site ID " + siteId);
 		}
+		queuePublishRequest(fce);
+		return true;
+	}
+
+	private boolean fail(String message) {
+		LOG.error(message);
+		return false;
+	}
+
+	private String getRelatedEntityId() throws FatalTriggerProviderException {
+		final String relatedEntityId;
+		try {
+			Workflow commonWorkflow = ((PublicWorkflowAdapter) this.workflow).getWorkflow();
+			relatedEntityId = commonWorkflow.getRelatedEntityId();
+		} catch (Throwable t) {
+			String workflowName = this.workflow == null ? "null" : this.workflow.getName();
+			String err = "Could not get commonWorkflow for workflow " + workflowName;
+			LOG.fatal(err, t);
+			throw new FatalTriggerProviderException(err, t);
+		}
+		return relatedEntityId;
+	}
+
+	private void queuePublishRequest(FolderContainedEntity fce) throws TriggerProviderException {
 		PublishRequest pubReq = new PublishRequest();
 		pubReq.setId(fce.getId());
 		pubReq.setFolder((Folder) fce);
@@ -94,12 +121,6 @@ public class ParentFolderPublisher extends Publisher {
 		} catch (Exception e) {
 			throw new TriggerProviderException(e.getLocalizedMessage(), e);
 		}
-		return true;
-	}
-
-	private boolean fail(String message) {
-		LOG.error(message);
-		return false;
 	}
 
 	public boolean triggerShouldFetchEntity() {
