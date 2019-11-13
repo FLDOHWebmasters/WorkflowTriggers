@@ -17,6 +17,7 @@ import com.hannonhill.cascade.model.util.SiteUtil;
 public class FolderPublisher extends BaseFolderPublisher {
 	private static final Logger LOG = Logger.getLogger(FolderPublisher.class);
 
+	@Override
 	protected Logger getLog() {
 		return LOG;
 	}
@@ -30,6 +31,7 @@ public class FolderPublisher extends BaseFolderPublisher {
 	 * 
 	 * @return boolean Successful Completion of Folder publish
 	 */
+	@Override
 	public boolean process() throws TriggerProviderException {
 		final Config config = new Config();
 		final String folder = getParameter("folder");

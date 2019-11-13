@@ -18,10 +18,12 @@ import com.hannonhill.cascade.model.util.SiteUtil;
 public class ParentFolderPublisher extends BaseFolderPublisher {
 	private static final Logger LOG = Logger.getLogger(ParentFolderPublisher.class);
 
+	@Override
 	protected Logger getLog() {
 		return LOG;
 	}
 
+	@Override
 	public boolean process() throws TriggerProviderException {
 		final Config config = new Config();
 		final String relatedEntityId = getRelatedEntityId();

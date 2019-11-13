@@ -362,11 +362,11 @@ public class DOHEmailProvider extends EmailProvider {
             if (siteNamePath == null) {
                 return null;
             }
-            siteId = GetSiteId(siteNamePath.getSiteName());
+            siteId = GetSiteId(siteNamePath.siteName);
             if (siteId == null) {
                 return null;
             }
-            templateFile = TryGetFile(siteId, siteNamePath.getPath());
+            templateFile = TryGetFile(siteId, siteNamePath.path);
         } else if (path.indexOf('/') > -1) {
             // path has has folders or start with a /
             if (defaultSiteId == null || defaultSiteId.length() == 0) {
@@ -422,25 +422,30 @@ public class DOHEmailProvider extends EmailProvider {
     /**
      * Basic object for Site Name and Path
      */
-    private class SiteNamePath {
-        private String SiteName;
-        private String Path;
+    static class SiteNamePath {
+        final String siteName;
+        final String path;
 
         SiteNamePath(String siteName, String path) {
-            SiteName = siteName;
-            Path = path;
+            this.siteName = siteName;
+            this.path = path;
         }
 
+        @Override
+        public boolean equals(Object obj) {
+        	if (obj == this) {
+        		return true;
+        	}
+        	if (obj == null || obj.getClass() != this.getClass()) {
+                return false;
+        	}
+        	SiteNamePath that = (SiteNamePath)obj;
+        	return this.siteName == that.siteName && this.path == that.path;
+        }
+
+        @Override
         public int hashCode() {
-            return new CascadeHashCodeBuilder().append(this.SiteName).append(this.Path).toHashCode();
-        }
-
-        String getSiteName() {
-            return SiteName;
-        }
-
-        String getPath() {
-            return Path;
+            return new CascadeHashCodeBuilder().append(this.siteName).append(this.path).toHashCode();
         }
     }
 

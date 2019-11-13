@@ -78,6 +78,7 @@ public abstract class BaseFolderPublisher extends Publisher {
 		}
 	}
 
+    @Override
 	public boolean triggerShouldFetchEntity() {
 		return true;
 	}
