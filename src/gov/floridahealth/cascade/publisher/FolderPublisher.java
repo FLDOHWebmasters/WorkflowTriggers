@@ -23,12 +23,13 @@ public class FolderPublisher extends BaseFolderPublisher {
 	}
 
 	/**
-	 * Main function of the Workflow Trigger 1.) Checks to see if a folder is
-	 * specified. If so, it uses it. If not, it defaults to the JSON folder. 2.)
-	 * Checks to see if a site is specified for the folder. If it does not exist,
-	 * defaults to the Site for the Asset being modified by the Workflow. 3.)
-	 * Constructs a Publish Request based upon the options and initiates it.
-	 * 
+	 * Main function of the Workflow Trigger <ol>
+	 * <li>Checks to see if a folder is specified. If so, it uses it. If not,
+	 * it defaults to the JSON folder.</li>
+	 * <li>Checks to see if a site is specified for the folder. If it does not
+	 * exist, defaults to the Site for the Asset being modified by the Workflow.</li>
+	 * <li>Constructs a Publish Request based upon the options and initiates it.</li>
+	 * </ol>
 	 * @return boolean Successful Completion of Folder publish
 	 */
 	@Override

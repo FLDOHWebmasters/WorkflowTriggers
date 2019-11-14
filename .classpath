@@ -8,8 +8,8 @@
 	<classpathentry kind="lib" path="lib/spring-context-3.2.13.RELEASE.jar"/>
 	<classpathentry kind="lib" path="lib/velocity-1.7.jar"/>
 	<classpathentry kind="lib" path="lib/commons-lang-2.6.1.jar"/>
-	<classpathentry kind="lib" path="C:/Users/KnickerbockerGM/Documents/Projects/CascadeWorkflowFiles"/>
 	<classpathentry kind="lib" path="lib/assetfactory-plugin-8.9.jar"/>
 	<classpathentry kind="lib" path="lib/cascade-api-8.9.jar"/>
+	<classpathentry kind="lib" path="C:/Users/KnickerbockerGM/Documents/Projects/CascadeClasses"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
