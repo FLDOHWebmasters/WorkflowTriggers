@@ -1,8 +1,5 @@
 package gov.floridahealth.cascade.publisher;
 
-import java.io.IOException;
-import java.util.Properties;
-
 import org.apache.log4j.Logger;
 
 import com.cms.workflow.FatalTriggerProviderException;
@@ -15,34 +12,7 @@ import com.hannonhill.cascade.model.dom.Workflow;
 import com.hannonhill.cascade.model.service.PublishService;
 import com.hannonhill.cascade.model.workflow.adapter.PublicWorkflowAdapter;
 
-import gov.floridahealth.cascade.properties.CascadeCustomProperties;
-
 public abstract class BaseFolderPublisher extends Publisher {
-	protected static class Config {
-		static final String PARENT_PARAM_PROP = "parent.param.name";
-		static final String DEFAULT_VALUE_PROP = "parent.parent.default.value";
-		static final String JSON_LOCATION_PROP = "json.defaultFolder";
-		final String parentParam;
-		final String defaultValue;
-		final String jsonLocation;
-		public Config() throws TriggerProviderException {
-			String parentParam = null, defaultValue = null, jsonLocation = null;
-			try {
-				Properties cascadeProperties = CascadeCustomProperties.getProperties();
-				parentParam = cascadeProperties.getProperty(PARENT_PARAM_PROP);
-				defaultValue = cascadeProperties.getProperty(DEFAULT_VALUE_PROP);
-				jsonLocation = cascadeProperties.getProperty(JSON_LOCATION_PROP);
-			} catch (IOException ioe) {
-				Logger.getLogger(BaseFolderPublisher.class).error("Could not get properties", ioe);
-				throw new TriggerProviderException(ioe.getMessage(), ioe);
-			} finally {
-				this.parentParam = parentParam;
-				this.defaultValue = defaultValue;
-				this.jsonLocation = jsonLocation;
-			}
-		}
-	}
-
 	protected boolean fail(String message) {
 		getLog().error(message);
 		return false;
@@ -56,7 +26,7 @@ public abstract class BaseFolderPublisher extends Publisher {
 			return commonWorkflow.getRelatedEntityId();
 		} catch (Throwable t) {
 			String workflowName = this.workflow == null ? "null" : this.workflow.getName();
-			String err = "Could not get commonWorkflow for workflow " + workflowName;
+			String err = "Could not get common workflow for workflow " + workflowName;
 			getLog().fatal(err, t);
 			throw new FatalTriggerProviderException(err, t);
 		}
@@ -74,6 +44,7 @@ public abstract class BaseFolderPublisher extends Publisher {
 		try {
 			pubServ.queue(pubReq);
 		} catch (Exception e) {
+			getLog().error("Publish queue failed", e);
 			throw new TriggerProviderException(e.getLocalizedMessage(), e);
 		}
 	}

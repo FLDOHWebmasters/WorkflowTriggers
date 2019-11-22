@@ -5,45 +5,47 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
+import org.apache.log4j.Logger;
+
+import com.cms.workflow.TriggerProviderException;
+
 /**
  * Simple Properties Object for the Cascade Custom Workflow Triggers
  * @author VerschageJX
  */
-public class CascadeCustomProperties extends Properties {
-    
-	private static final long serialVersionUID = 1L;
+public class CascadeCustomProperties {
+	private static final String PROP_FILE = "/resources/config.properties";
 	private static Properties props;
-	
+
 	/**
-	 * Property Values Singleton for the DOH Cascade Custom Jar
-	 * @throws IOException returned from getProperties
+	 * Gets a property value for use by a workflow trigger.
+	 * @param propertyName the name of the property
+	 * @return the value of the property
+	 * @throws TriggerProviderException the properties file cannot be loaded
 	 */
-	private CascadeCustomProperties() throws IOException {
-		loadPropValues();
+	public static String getProperty(String propertyName) throws TriggerProviderException {
+		if (props == null) {
+			try {
+				loadProperties();
+			} catch (IOException e) {
+				Logger.getLogger(CascadeCustomProperties.class).error("Could not get properties", e);
+				throw new TriggerProviderException("Failed to get property " + propertyName, e);
+			}
+		}
+		return props.getProperty(propertyName);
 	}
 
 	/**
-	 * Retrieves the Properties object from the static object
-	 * @return Cascade specific properties object
-	 * @throws IOException returned from loadPropValues
+	 * Caches the properties found in /resources/config.properties
+	 * @return properties relevant to workflow triggers
+	 * @throws IOException if the file is not found or loaded
 	 */
-	public static Properties getProperties() throws IOException{
-		if (props == null) {
-			props = new CascadeCustomProperties();
+	private static void loadProperties() throws IOException {
+		InputStream inputStream = CascadeCustomProperties.class.getClassLoader().getResourceAsStream(PROP_FILE);
+		if (inputStream == null) {
+			throw new FileNotFoundException("Property File " + PROP_FILE + " not found.");
 		}
-		return props;
+		props = new Properties();
+		props.load(inputStream);
 	}
-        
-	/**
-	 * Loads the properties found in /resources/config.properties
-	 * @throws IOException Unable to find the file
-	 */
-    private void loadPropValues() throws IOException {
-        String propFileName = "/resources/config.properties";
-        InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream(propFileName);
-        if (inputStream != null) {
-            props.load(inputStream);            ;
-        }
-        throw new FileNotFoundException("Property File " + propFileName + " not found.");
-    }
 }

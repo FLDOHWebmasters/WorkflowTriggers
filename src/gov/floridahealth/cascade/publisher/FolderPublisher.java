@@ -14,7 +14,10 @@ import com.hannonhill.cascade.model.dom.identifier.EntityTypes;
 import com.hannonhill.cascade.model.service.LocatorService;
 import com.hannonhill.cascade.model.util.SiteUtil;
 
+import gov.floridahealth.cascade.properties.CascadeCustomProperties;
+
 public class FolderPublisher extends BaseFolderPublisher {
+	private static final String JSON_LOCATION_PROP = "json.defaultFolder";
 	private static final Logger LOG = Logger.getLogger(FolderPublisher.class);
 
 	@Override
@@ -34,7 +37,7 @@ public class FolderPublisher extends BaseFolderPublisher {
 	 */
 	@Override
 	public boolean process() throws TriggerProviderException {
-		final Config config = new Config();
+		LOG.info("Starting custom workflow trigger");
 		final String folder = getParameter("folder");
 		final String siteName = getParameter("site");
 		final String relatedEntityId = getRelatedEntityId();
@@ -56,9 +59,10 @@ public class FolderPublisher extends BaseFolderPublisher {
 		if (siteId == null) {
 			return fail("siteId was null");
 		}
-		final String path = folder != null && folder != "" ? folder : config.jsonLocation;
+		final String jsonLocation = CascadeCustomProperties.getProperty(JSON_LOCATION_PROP);
+		final String path = folder != null && folder != "" ? folder : jsonLocation;
 		if (path == null) {
-			return fail(Config.JSON_LOCATION_PROP + " property has no value");
+			return fail(JSON_LOCATION_PROP + " property has no value");
 		}
 		final FolderContainedEntity fce;
 		try {

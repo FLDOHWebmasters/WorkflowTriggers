@@ -8,6 +8,8 @@ import com.hannonhill.cascade.model.dom.identifier.EntityTypes;
 import com.hannonhill.cascade.model.service.LocatorService;
 import com.hannonhill.cascade.model.util.SiteUtil;
 
+import gov.floridahealth.cascade.properties.CascadeCustomProperties;
+
 /**
  * Publishes an ancestor folder of the asset involved in a workflow. Values to
  * use: PARENT - 1 Folder Up GRANDPARENT - 2 Folders Up GREATGRANDPARENT - 3
@@ -16,6 +18,8 @@ import com.hannonhill.cascade.model.util.SiteUtil;
  * @author VerschageJX
  */
 public class ParentFolderPublisher extends BaseFolderPublisher {
+	private static final String PARENT_PARAM_PROP = "parent.param.name";
+	private static final String DEFAULT_VALUE_PROP = "parent.parent.default.value";
 	private static final Logger LOG = Logger.getLogger(ParentFolderPublisher.class);
 
 	@Override
@@ -25,7 +29,7 @@ public class ParentFolderPublisher extends BaseFolderPublisher {
 
 	@Override
 	public boolean process() throws TriggerProviderException {
-		final Config config = new Config();
+		LOG.info("Starting custom workflow trigger");
 		final String relatedEntityId = getRelatedEntityId();
 		LocatorService service = this.serviceProvider.getLocatorService();
 		FolderContainedEntity fce = service.locateFolderContainedEntity(relatedEntityId);
@@ -37,9 +41,9 @@ public class ParentFolderPublisher extends BaseFolderPublisher {
 		if (siteId == null) {
 			return fail("Site ID not found for asset: " + itemPath);
 		}
-		String parentType = getParameter(config.parentParam);
+		String parentType = getParameter(CascadeCustomProperties.getProperty(PARENT_PARAM_PROP));
 		if (parentType == null || parentType == "") {
-			parentType = config.defaultValue;
+			parentType = CascadeCustomProperties.getProperty(DEFAULT_VALUE_PROP);
 		}
 		String parentFolderLocation = itemPath.substring(0, itemPath.lastIndexOf('/'));
 		if (parentType.equals("GRANDPARENT")) {
