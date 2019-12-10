@@ -8,16 +8,13 @@ package gov.floridahealth.cascade.publisher;
 import org.apache.log4j.Logger;
 
 import com.cms.workflow.TriggerProviderException;
-import com.hannonhill.cascade.model.dom.Folder;
-import com.hannonhill.cascade.model.dom.FolderContainedEntity;
-import com.hannonhill.cascade.model.dom.Page;
-import com.hannonhill.cascade.model.dom.Site;
+import com.hannonhill.cascade.model.dom.*;
 import com.hannonhill.cascade.model.dom.identifier.EntityType;
 import com.hannonhill.cascade.model.dom.identifier.EntityTypes;
 import com.hannonhill.cascade.model.service.LocatorService;
 import com.hannonhill.cascade.model.util.SiteUtil;
 
-import gov.floridahealth.cascade.properties.CascadeCustomProperties;
+import gov.floridahealth.util.CascadeCustomProperties;
 
 public class FolderPublisher extends BaseFolderPublisher {
 	private static final String JSON_LOCATION_PROP = "json.defaultFolder";
@@ -31,12 +28,13 @@ public class FolderPublisher extends BaseFolderPublisher {
 	/**
 	 * Main function of the Workflow Trigger <ol>
 	 * <li>Checks to see if a folder is specified. If so, it uses it. If not,
-	 * it defaults to the JSON folder.</li>
+	 * it defaults to the JSON folder unless the asset being published is a county
+	 * location page, in which case the locations index page is published as well.</li>
 	 * <li>Checks to see if a site is specified for the folder. If it does not
 	 * exist, defaults to the Site for the Asset being modified by the Workflow.</li>
 	 * <li>Constructs a Publish Request based upon the options and initiates it.</li>
 	 * </ol>
-	 * @return boolean Successful Completion of Folder publish
+	 * @return boolean whether the parent resource was published successfully
 	 */
 	@Override
 	public boolean process() throws TriggerProviderException {
@@ -44,8 +42,8 @@ public class FolderPublisher extends BaseFolderPublisher {
 		final String folderName = getParameter("folder");
 		final String siteName = getParameter("site");
 		final String relatedEntityId = getRelatedEntityId();
-		final boolean folderSpecified = folderName != null && folderName != "";
-		final boolean siteSpecified = siteName != null && siteName != "";
+		final boolean folderSpecified = folderName != null && !folderName.isEmpty();
+		final boolean siteSpecified = siteName != null && !siteName.isEmpty();
 		final LocatorService service = this.serviceProvider.getLocatorService();
 		final FolderContainedEntity asset;
 		if (folderSpecified && siteSpecified) {
@@ -82,7 +80,7 @@ public class FolderPublisher extends BaseFolderPublisher {
 		} catch (Exception e) {
 			return fail("Could not get the designated entity: " + path + " in site ID " + siteId);
 		}
-		if (entityType == EntityTypes.TYPE_FOLDER) {
+		if (EntityTypes.TYPE_FOLDER.equals(entityType)) {
 			queuePublishRequest((Folder)entity);
 		} else {
 			queuePublishRequest((Page)entity);
@@ -92,11 +90,13 @@ public class FolderPublisher extends BaseFolderPublisher {
 
 	// if the asset is a page in a top-level locations folder and is not the index page, return the index page
 	private String getIndexPath(FolderContainedEntity asset) {
-		final int slashIndex = asset.getPath().indexOf("/");
-		final boolean isTopLevel = slashIndex > 0 && asset.getPath().indexOf("/", slashIndex + 1) < 0;
-		final boolean isLocation = isTopLevel && asset.getPath().substring(0, slashIndex) == "locations";
-		final boolean isPage = asset.getType() == EntityTypes.TYPE_PAGE;
-		if (isLocation && isPage && asset.getPath().substring(slashIndex + 1) != "index") {
+		final String path = asset.getPath();
+		final int slashIndex = path.indexOf("/");
+		final boolean isTopLevel = slashIndex > 0 && path.indexOf("/", slashIndex + 1) < 0;
+		final boolean isLocation = isTopLevel && "locations".equals(path.substring(0, slashIndex));
+		final boolean isPage = EntityTypes.TYPE_PAGE.equals(asset.getType());
+		final boolean isLocPage = isLocation && isPage && !"index".equals(path.substring(slashIndex + 1));
+		if (isLocPage) {
 			return "locations/index";
 		}
 		return null;

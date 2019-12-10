@@ -43,7 +43,7 @@ import com.hannonhill.cascade.model.workflow.adapter.PublicWorkflowAdapter;
 import com.hannonhill.commons.util.ClassUtil;
 import com.hannonhill.commons.util.StringUtil;
 
-import gov.floridahealth.cascade.properties.CascadeCustomProperties;
+import gov.floridahealth.util.CascadeCustomProperties;
 
 public class DOHEmailProvider extends EmailProvider {
 	private static final Logger LOG = Logger.getLogger(DOHEmailProvider.class);

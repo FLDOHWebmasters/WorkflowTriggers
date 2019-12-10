@@ -9,7 +9,7 @@ import com.hannonhill.cascade.model.dom.identifier.EntityTypes;
 import com.hannonhill.cascade.model.service.LocatorService;
 import com.hannonhill.cascade.model.util.SiteUtil;
 
-import gov.floridahealth.cascade.properties.CascadeCustomProperties;
+import gov.floridahealth.util.CascadeCustomProperties;
 
 /**
  * Publishes an ancestor folder of the asset involved in a workflow. Values to
@@ -43,7 +43,7 @@ public class ParentFolderPublisher extends BaseFolderPublisher {
 			return fail("Site ID not found for asset: " + itemPath);
 		}
 		String parentType = getParameter(CascadeCustomProperties.getProperty(PARENT_PARAM_PROP));
-		if (parentType == null || parentType == "") {
+		if (parentType == null || parentType.isEmpty()) {
 			parentType = CascadeCustomProperties.getProperty(DEFAULT_VALUE_PROP);
 		}
 		String parentFolderLocation = itemPath.substring(0, itemPath.lastIndexOf('/'));
@@ -55,7 +55,7 @@ public class ParentFolderPublisher extends BaseFolderPublisher {
 		} else if (!parentType.equals("PARENT")) {
 			return fail("Parent type invalid: " + parentType);
 		}
-		if (parentFolderLocation == "") {
+		if (parentFolderLocation.isEmpty()) {
 			return fail("Missing " + parentType + " folder for asset: " + itemPath);
 		}
 		try {

@@ -5,11 +5,7 @@ import org.apache.log4j.Logger;
 import com.cms.workflow.FatalTriggerProviderException;
 import com.cms.workflow.TriggerProviderException;
 import com.cms.workflow.function.Publisher;
-import com.hannonhill.cascade.model.dom.File;
-import com.hannonhill.cascade.model.dom.Folder;
-import com.hannonhill.cascade.model.dom.Page;
-import com.hannonhill.cascade.model.dom.PublishRequest;
-import com.hannonhill.cascade.model.dom.Workflow;
+import com.hannonhill.cascade.model.dom.*;
 import com.hannonhill.cascade.model.service.PublishService;
 import com.hannonhill.cascade.model.workflow.adapter.PublicWorkflowAdapter;
 
