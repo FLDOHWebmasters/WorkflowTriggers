@@ -5,8 +5,9 @@ import org.apache.log4j.Logger;
 import com.cms.workflow.FatalTriggerProviderException;
 import com.cms.workflow.TriggerProviderException;
 import com.cms.workflow.function.Publisher;
+import com.hannonhill.cascade.model.dom.File;
 import com.hannonhill.cascade.model.dom.Folder;
-import com.hannonhill.cascade.model.dom.FolderContainedEntity;
+import com.hannonhill.cascade.model.dom.Page;
 import com.hannonhill.cascade.model.dom.PublishRequest;
 import com.hannonhill.cascade.model.dom.Workflow;
 import com.hannonhill.cascade.model.service.PublishService;
@@ -32,11 +33,34 @@ public abstract class BaseFolderPublisher extends Publisher {
 		}
 	}
 
-	protected void queuePublishRequest(FolderContainedEntity fce) throws TriggerProviderException {
+	// Hierarchy: File < PublishableEntity < ExpiringEntity < DublinMetadataAwareEntity < FolderContainedEntity
+	protected void queuePublishRequest(File file) throws TriggerProviderException {
+		PublishRequest pubReq = new PublishRequest();
+		// Without both the ID of the file and the File object, publishing fails.
+		pubReq.setId(file.getId());
+		pubReq.setFile(file);
+		queuePublishRequest(pubReq);
+	}
+
+	// Hierarchy: Folder < PublishableEntity < ExpiringEntity < DublinMetadataAwareEntity < FolderContainedEntity
+	protected void queuePublishRequest(Folder folder) throws TriggerProviderException {
 		PublishRequest pubReq = new PublishRequest();
 		// Without both the ID of the folder and the Folder object, publishing fails.
-		pubReq.setId(fce.getId());
-		pubReq.setFolder((Folder)fce);
+		pubReq.setId(folder.getId());
+		pubReq.setFolder(folder);
+		queuePublishRequest(pubReq);
+	}
+
+	// Hierarchy: Page < PublishableEntity < ExpiringEntity < DublinMetadataAwareEntity < FolderContainedEntity
+	protected void queuePublishRequest(Page page) throws TriggerProviderException {
+		PublishRequest pubReq = new PublishRequest();
+		// Without both the ID of the page and the Page object, publishing fails.
+		pubReq.setId(page.getId());
+		pubReq.setPage(page);
+		queuePublishRequest(pubReq);
+	}
+
+	private void queuePublishRequest(PublishRequest pubReq) throws TriggerProviderException {
 		pubReq.setPublishAllDestinations(true);
 		pubReq.setGenerateReport(false);
 		pubReq.setUsername("_publisher");

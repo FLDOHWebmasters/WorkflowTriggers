@@ -3,6 +3,7 @@ package gov.floridahealth.cascade.publisher;
 import org.apache.log4j.Logger;
 
 import com.cms.workflow.TriggerProviderException;
+import com.hannonhill.cascade.model.dom.Folder;
 import com.hannonhill.cascade.model.dom.FolderContainedEntity;
 import com.hannonhill.cascade.model.dom.identifier.EntityTypes;
 import com.hannonhill.cascade.model.service.LocatorService;
@@ -62,7 +63,7 @@ public class ParentFolderPublisher extends BaseFolderPublisher {
 		} catch (Exception e) {
 			return fail("Could not get the designated folder: " + parentFolderLocation + " in site ID " + siteId);
 		}
-		queuePublishRequest(fce);
+		queuePublishRequest((Folder)fce);
 		return true;
 	}
 }
