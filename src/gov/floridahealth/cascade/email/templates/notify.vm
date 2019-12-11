@@ -1,0 +1,13 @@
+#set($_subject = "Workflow: ${_workflowName} has been returned to you")
+<html>
+    <head>
+    </head>
+    <body>
+        <p>Workflow: ${_workflowName}</p>
+        <p>A page you worked on has been returned to you.</p>
+            #if ($_comments.length() > 0)
+                <p><strong>${_comments}</strong></p>
+            #end
+        <p><a href="${_entityUrl}">View the page in CMS</a>.</p>
+    </body>
+</html>
