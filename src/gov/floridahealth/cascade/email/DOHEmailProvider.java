@@ -20,6 +20,7 @@ import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
 import com.cms.workflow.FatalTriggerProviderException;
 import com.cms.workflow.TriggerProviderException;
+import com.cms.workflow.WorkflowTriggerProcessingResult;
 import com.cms.workflow.function.EmailProvider;
 import com.hannonhill.cascade.api.adapters.APIAdapterFactory;
 import com.hannonhill.cascade.api.asset.home.File;
@@ -93,7 +94,7 @@ public class DOHEmailProvider extends EmailProvider {
 	 * Main Process Function - Requirement of all Triggers for Cascade
 	 */
 	@Override
-	public boolean process() throws TriggerProviderException {
+	public WorkflowTriggerProcessingResult process() throws TriggerProviderException {
 		/* Mode contains the name of the Velocity file to use for the email */
 		String mode = parameters.get(MODE_PARAM);
 		/*
@@ -257,7 +258,7 @@ public class DOHEmailProvider extends EmailProvider {
 				}
 			}
 		}
-		return true;
+		return WorkflowTriggerProcessingResult.CONTINUE;
 	}
 
 	/**

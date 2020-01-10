@@ -8,6 +8,7 @@ package gov.floridahealth.cascade.publisher;
 import org.apache.log4j.Logger;
 
 import com.cms.workflow.TriggerProviderException;
+import com.cms.workflow.WorkflowTriggerProcessingResult;
 import com.hannonhill.cascade.model.dom.*;
 import com.hannonhill.cascade.model.dom.identifier.EntityType;
 import com.hannonhill.cascade.model.dom.identifier.EntityTypes;
@@ -37,7 +38,7 @@ public class FolderPublisher extends BaseFolderPublisher {
 	 * @return boolean whether the parent resource was published successfully
 	 */
 	@Override
-	public boolean process() throws TriggerProviderException {
+	public WorkflowTriggerProcessingResult process() throws TriggerProviderException {
 		LOG.info("Starting custom workflow trigger");
 		final String folderName = getParameter("folder");
 		final String siteName = getParameter("site");
@@ -85,7 +86,7 @@ public class FolderPublisher extends BaseFolderPublisher {
 		} else {
 			queuePublishRequest((Page)entity);
 		}
-		return true;
+		return WorkflowTriggerProcessingResult.CONTINUE;
 	}
 
 	// if the asset is a page in a top-level locations folder and is not the index page, return the index page

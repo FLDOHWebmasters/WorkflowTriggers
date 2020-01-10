@@ -3,6 +3,7 @@ package gov.floridahealth.cascade.publisher;
 import org.apache.log4j.Logger;
 
 import com.cms.workflow.TriggerProviderException;
+import com.cms.workflow.WorkflowTriggerProcessingResult;
 import com.hannonhill.cascade.model.dom.Folder;
 import com.hannonhill.cascade.model.dom.FolderContainedEntity;
 import com.hannonhill.cascade.model.dom.identifier.EntityTypes;
@@ -29,7 +30,7 @@ public class ParentFolderPublisher extends BaseFolderPublisher {
 	}
 
 	@Override
-	public boolean process() throws TriggerProviderException {
+	public WorkflowTriggerProcessingResult process() throws TriggerProviderException {
 		LOG.info("Starting custom workflow trigger");
 		final String relatedEntityId = getRelatedEntityId();
 		LocatorService service = this.serviceProvider.getLocatorService();
@@ -64,6 +65,6 @@ public class ParentFolderPublisher extends BaseFolderPublisher {
 			return fail("Could not get the designated folder: " + parentFolderLocation + " in site ID " + siteId);
 		}
 		queuePublishRequest((Folder)fce);
-		return true;
+		return WorkflowTriggerProcessingResult.CONTINUE;
 	}
 }

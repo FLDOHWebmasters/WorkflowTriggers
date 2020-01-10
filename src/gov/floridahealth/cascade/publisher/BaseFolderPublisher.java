@@ -4,15 +4,16 @@ import org.apache.log4j.Logger;
 
 import com.cms.workflow.FatalTriggerProviderException;
 import com.cms.workflow.TriggerProviderException;
+import com.cms.workflow.WorkflowTriggerProcessingResult;
 import com.cms.workflow.function.Publisher;
 import com.hannonhill.cascade.model.dom.*;
 import com.hannonhill.cascade.model.service.PublishService;
 import com.hannonhill.cascade.model.workflow.adapter.PublicWorkflowAdapter;
 
 public abstract class BaseFolderPublisher extends Publisher {
-	protected boolean fail(String message) {
+	protected WorkflowTriggerProcessingResult fail(String message) {
 		getLog().error(message);
-		return false;
+		return WorkflowTriggerProcessingResult.CONTINUE;
 	}
 
 	protected abstract Logger getLog();
