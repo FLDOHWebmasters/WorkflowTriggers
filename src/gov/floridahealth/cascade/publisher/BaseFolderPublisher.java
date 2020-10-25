@@ -7,6 +7,7 @@ import com.cms.workflow.TriggerProviderException;
 import com.cms.workflow.WorkflowTriggerProcessingResult;
 import com.cms.workflow.function.Publisher;
 import com.hannonhill.cascade.model.dom.*;
+import com.hannonhill.cascade.model.dom.identifier.EntityTypes;
 import com.hannonhill.cascade.model.service.PublishService;
 import com.hannonhill.cascade.model.workflow.adapter.PublicWorkflowAdapter;
 
@@ -28,6 +29,16 @@ public abstract class BaseFolderPublisher extends Publisher {
 			getLog().fatal(err, t);
 			throw new FatalTriggerProviderException(err, t);
 		}
+	}
+
+	// return whether the asset is a page in a top-level locations folder and is not the index page
+	protected boolean isLocation(FolderContainedEntity asset) {
+		final String path = asset.getPath();
+		final int slashIndex = path.indexOf("/");
+		final boolean isTopLevel = slashIndex > 0 && path.indexOf("/", slashIndex + 1) < 0;
+		final boolean isLocation = isTopLevel && path.startsWith("locations");
+		final boolean isPage = EntityTypes.TYPE_PAGE.equals(asset.getType());
+		return isLocation && isPage && !path.endsWith("index");
 	}
 
 	// Hierarchy: File < PublishableEntity < ExpiringEntity < DublinMetadataAwareEntity < FolderContainedEntity

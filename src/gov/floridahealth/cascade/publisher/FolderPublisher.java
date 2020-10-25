@@ -5,6 +5,15 @@
  */
 package gov.floridahealth.cascade.publisher;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.InetAddress;
+import java.net.URL;
+import java.net.UnknownHostException;
+import java.util.Map;
+
 import org.apache.log4j.Logger;
 
 import com.cms.workflow.TriggerProviderException;
@@ -18,6 +27,11 @@ import com.hannonhill.cascade.model.util.SiteUtil;
 import gov.floridahealth.util.CascadeCustomProperties;
 
 public class FolderPublisher extends BaseFolderPublisher {
+	private static final String DEV_ENV_PROP_PREFIX = "dev";
+	private static final String TEST_ENV_PROP_PREFIX = "test";
+	private static final String PROD_ENV_PROP_PREFIX = "prod";
+	private static final String NODE_HOST_PROP_SUFFIX = ".nodejs.host";
+	private static final String CASCADE_HOST_PROP_SUFFIX = ".cascade.host";
 	private static final String JSON_LOCATION_PROP = "json.defaultFolder";
 	private static final Logger LOG = Logger.getLogger(FolderPublisher.class);
 
@@ -68,10 +82,10 @@ public class FolderPublisher extends BaseFolderPublisher {
 		if (siteId == null) {
 			return fail("siteId was null");
 		}
-		final String indexPage = folderSpecified ? null : getIndexPath(asset);
+		final boolean isLocation = !folderSpecified && isLocation(asset);
 		final String jsonLocation = CascadeCustomProperties.getProperty(JSON_LOCATION_PROP);
-		final String path = indexPage != null ? indexPage : folderSpecified ? folderName : jsonLocation;
-		final EntityType entityType = indexPage != null ? EntityTypes.TYPE_PAGE : EntityTypes.TYPE_FOLDER;
+		final EntityType entityType = isLocation ? EntityTypes.TYPE_PAGE : EntityTypes.TYPE_FOLDER;
+		final String path = isLocation ? "locations/index" : folderSpecified ? folderName : jsonLocation;
 		if (path == null) {
 			return fail(JSON_LOCATION_PROP + " property has no value");
 		}
@@ -86,20 +100,48 @@ public class FolderPublisher extends BaseFolderPublisher {
 		} else {
 			queuePublishRequest((Page)entity);
 		}
+		if (isLocation) {
+			try {
+				generateLocationJson();
+			} catch (IOException e) {
+				LOG.error(e);
+				return fail("Could not generate location JSON.");
+			}
+		}
 		return WorkflowTriggerProcessingResult.CONTINUE;
 	}
 
-	// if the asset is a page in a top-level locations folder and is not the index page, return the index page
-	private String getIndexPath(FolderContainedEntity asset) {
-		final String path = asset.getPath();
-		final int slashIndex = path.indexOf("/");
-		final boolean isTopLevel = slashIndex > 0 && path.indexOf("/", slashIndex + 1) < 0;
-		final boolean isLocation = isTopLevel && "locations".equals(path.substring(0, slashIndex));
-		final boolean isPage = EntityTypes.TYPE_PAGE.equals(asset.getType());
-		final boolean isLocPage = isLocation && isPage && !"index".equals(path.substring(slashIndex + 1));
-		if (isLocPage) {
-			return "locations/index";
+	public void generateLocationJson() throws IOException, TriggerProviderException {
+		String serverName;
+		Map<String, String> system = System.getenv();
+	    if (system.containsKey("COMPUTERNAME")) {
+	    	serverName = system.get("COMPUTERNAME"); // "HOSTNAME" on Unix/Linux
+	    } else try {
+	    	serverName = InetAddress.getLocalHost().getHostName();
+	    } catch (UnknownHostException e) {
+	    	throw new TriggerProviderException(e.getMessage(), e);
+	    }
+		String cascadeTest = CascadeCustomProperties.getProperty(TEST_ENV_PROP_PREFIX + CASCADE_HOST_PROP_SUFFIX);
+		String cascadeProd = CascadeCustomProperties.getProperty(PROD_ENV_PROP_PREFIX + CASCADE_HOST_PROP_SUFFIX);
+		String environment = DEV_ENV_PROP_PREFIX;
+		if (serverName.startsWith(cascadeTest)) {
+			environment = TEST_ENV_PROP_PREFIX;
+		} else if (serverName.startsWith(cascadeProd)) {
+			environment = PROD_ENV_PROP_PREFIX;
 		}
-		return null;
+		final String nodeHostProp = environment + NODE_HOST_PROP_SUFFIX;
+		final String nodeHost = CascadeCustomProperties.getProperty(nodeHostProp);
+
+		LOG.info("Starting location JSON generation/publish");
+		final URL url = new URL("https://" + nodeHost + ":8443/locations/load");
+		String outputString = "";
+		HttpURLConnection httpConn = (HttpURLConnection)url.openConnection();
+		InputStreamReader isr = new InputStreamReader(httpConn.getInputStream());
+		BufferedReader in = new BufferedReader(isr);
+		String responseString;
+		while ((responseString = in.readLine()) != null) {
+			outputString = outputString + responseString;
+		}
+		System.out.println(outputString);
 	}
 }
