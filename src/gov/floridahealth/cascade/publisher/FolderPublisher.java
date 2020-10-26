@@ -103,15 +103,15 @@ public class FolderPublisher extends BaseFolderPublisher {
 		if (isLocation) {
 			try {
 				generateLocationJson();
-			} catch (IOException e) {
+			} catch (Exception e) {
 				LOG.error(e);
-				return fail("Could not generate location JSON.");
+				return fail("Could not generate location JSON. " + e.getMessage());
 			}
 		}
 		return WorkflowTriggerProcessingResult.CONTINUE;
 	}
 
-	public void generateLocationJson() throws IOException, TriggerProviderException {
+	public void generateLocationJson() throws TriggerProviderException {
 		String serverName;
 		Map<String, String> system = System.getenv();
 	    if (system.containsKey("COMPUTERNAME")) {
@@ -133,14 +133,19 @@ public class FolderPublisher extends BaseFolderPublisher {
 		final String nodeHost = CascadeCustomProperties.getProperty(nodeHostProp);
 
 		LOG.info("Starting location JSON generation/publish");
-		final URL url = new URL("https://" + nodeHost + ":8443/locations/load");
+		final String uri = "https://" + nodeHost + ":8443/locations/load";
 		String outputString = "";
-		HttpURLConnection httpConn = (HttpURLConnection)url.openConnection();
-		InputStreamReader isr = new InputStreamReader(httpConn.getInputStream());
-		BufferedReader in = new BufferedReader(isr);
-		String responseString;
-		while ((responseString = in.readLine()) != null) {
-			outputString = outputString + responseString;
+		try {
+			final URL url = new URL(uri);
+			HttpURLConnection httpConn = (HttpURLConnection)url.openConnection();
+			InputStreamReader isr = new InputStreamReader(httpConn.getInputStream());
+			BufferedReader in = new BufferedReader(isr);
+			String responseString;
+			while ((responseString = in.readLine()) != null) {
+				outputString = outputString + responseString;
+			}
+		} catch (IOException e) {
+			throw new TriggerProviderException(uri + ": " + e.getMessage(), e);
 		}
 		System.out.println(outputString);
 	}
