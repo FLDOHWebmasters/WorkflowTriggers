@@ -121,6 +121,7 @@ public class FolderPublisher extends BaseFolderPublisher {
 	    } catch (UnknownHostException e) {
 	    	throw new TriggerProviderException(e.getMessage(), e);
 	    }
+	    serverName = serverName.toLowerCase();
 		String cascadeTest = CascadeCustomProperties.getProperty(TEST_ENV_PROP_PREFIX + CASCADE_HOST_PROP_SUFFIX);
 		String cascadeProd = CascadeCustomProperties.getProperty(PROD_ENV_PROP_PREFIX + CASCADE_HOST_PROP_SUFFIX);
 		String environment = DEV_ENV_PROP_PREFIX;
@@ -145,8 +146,7 @@ public class FolderPublisher extends BaseFolderPublisher {
 				outputString = outputString + responseString;
 			}
 		} catch (IOException e) {
-			throw new TriggerProviderException(uri + ": " + e.getMessage(), e);
+			throw new TriggerProviderException("From " + serverName + " to " + uri + ": " + e.getMessage(), e);
 		}
-		System.out.println(outputString);
 	}
 }
