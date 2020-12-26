@@ -1,5 +1,9 @@
 package gov.floridahealth.cascade.publisher;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.Map;
+
 import org.apache.log4j.Logger;
 
 import com.cms.workflow.FatalTriggerProviderException;
@@ -11,13 +15,59 @@ import com.hannonhill.cascade.model.dom.identifier.EntityTypes;
 import com.hannonhill.cascade.model.service.PublishService;
 import com.hannonhill.cascade.model.workflow.adapter.PublicWorkflowAdapter;
 
+import gov.floridahealth.util.CascadeCustomProperties;
+
 public abstract class BaseFolderPublisher extends Publisher {
+	private static final String DEV_ENV_PROP_PREFIX = "dev";
+	private static final String TEST_ENV_PROP_PREFIX = "test";
+	private static final String PROD_ENV_PROP_PREFIX = "prod";
+	private static final String NODE_HOST_PROP_SUFFIX = ".nodejs.host";
+	private static final String CASCADE_HOST_PROP_SUFFIX = ".cascade.host";
+
 	protected WorkflowTriggerProcessingResult fail(String message) {
 		getLog().error(message);
 		return WorkflowTriggerProcessingResult.CONTINUE;
 	}
 
 	protected abstract Logger getLog();
+
+	protected String getCascadeHost() throws TriggerProviderException {
+		return getServerName();
+	}
+
+	protected String getServerName() throws TriggerProviderException {
+		final String serverName;
+		final Map<String, String> system = System.getenv();
+	    if (system.containsKey("COMPUTERNAME")) {
+	    	serverName = system.get("COMPUTERNAME").toLowerCase(); // "HOSTNAME" on Unix/Linux
+	    } else try {
+	    	serverName = InetAddress.getLocalHost().getHostName().toLowerCase();
+	    } catch (UnknownHostException e) {
+	    	throw new TriggerProviderException(e.getMessage(), e);
+	    }
+	    return serverName;
+	}
+
+	protected String getNodeJsHost() throws TriggerProviderException {
+		final String serverName = getServerName();
+		return getNodeJsHost(serverName);
+	}
+
+	protected String getNodeJsHost(String serverName) throws TriggerProviderException {
+		final String cascadeTest = CascadeCustomProperties.getProperty(TEST_ENV_PROP_PREFIX + CASCADE_HOST_PROP_SUFFIX);
+		final String cascadeProd = CascadeCustomProperties.getProperty(PROD_ENV_PROP_PREFIX + CASCADE_HOST_PROP_SUFFIX);
+		final String environment;
+		if (serverName.startsWith(cascadeProd)) {
+			environment = PROD_ENV_PROP_PREFIX;
+		} else if (serverName.startsWith(cascadeTest)) {
+			environment = TEST_ENV_PROP_PREFIX;
+		} else {
+			environment = DEV_ENV_PROP_PREFIX;
+		}
+		final String nodeHostProp = environment + NODE_HOST_PROP_SUFFIX;
+		final String nodeHost = CascadeCustomProperties.getProperty(nodeHostProp);
+		return "https://" + nodeHost + ":8443";
+	}
 
 	protected String getRelatedEntityId() throws FatalTriggerProviderException {
 		try {

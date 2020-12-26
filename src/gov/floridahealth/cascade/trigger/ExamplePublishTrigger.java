@@ -5,7 +5,7 @@ import org.apache.log4j.Logger;
 import com.cms.publish.*;
 
 /**
- * This is custom a publish trigger, configurable in Cascade under Administration >
+ * This is a custom publish trigger, configurable in Cascade under Administration >
  * Manage Triggers & Plugins > Publish Triggers. The idea was to hardcode it to publish
  * dependent resources when certain resources are published, for instance to publish
  * the locations index page when any other page in the locations folder is published.

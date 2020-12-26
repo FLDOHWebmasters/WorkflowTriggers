@@ -9,10 +9,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.InetAddress;
 import java.net.URL;
-import java.net.UnknownHostException;
-import java.util.Map;
 
 import org.apache.log4j.Logger;
 
@@ -27,12 +24,7 @@ import com.hannonhill.cascade.model.util.SiteUtil;
 import gov.floridahealth.util.CascadeCustomProperties;
 
 public class FolderPublisher extends BaseFolderPublisher {
-	private static final String DEV_ENV_PROP_PREFIX = "dev";
-	private static final String TEST_ENV_PROP_PREFIX = "test";
-	private static final String PROD_ENV_PROP_PREFIX = "prod";
-	private static final String NODE_HOST_PROP_SUFFIX = ".nodejs.host";
-	private static final String CASCADE_HOST_PROP_SUFFIX = ".cascade.host";
-	private static final String JSON_LOCATION_PROP = "json.defaultFolder";
+	private static final String JSON_FOLDER_PROP = "json.defaultFolder";
 	private static final Logger LOG = Logger.getLogger(FolderPublisher.class);
 
 	@Override
@@ -83,12 +75,12 @@ public class FolderPublisher extends BaseFolderPublisher {
 			return fail("siteId was null");
 		}
 		final boolean isLocation = !folderSpecified && isLocation(asset);
-		final String jsonLocation = CascadeCustomProperties.getProperty(JSON_LOCATION_PROP);
-		final EntityType entityType = isLocation ? EntityTypes.TYPE_PAGE : EntityTypes.TYPE_FOLDER;
-		final String path = isLocation ? "locations/index" : folderSpecified ? folderName : jsonLocation;
+		final String jsonFolderName = CascadeCustomProperties.getProperty(JSON_FOLDER_PROP);
+		final String path = isLocation ? "locations/index" : folderSpecified ? folderName : jsonFolderName;
 		if (path == null) {
-			return fail(JSON_LOCATION_PROP + " property has no value");
+			return fail(JSON_FOLDER_PROP + " property has no value");
 		}
+		final EntityType entityType = isLocation ? EntityTypes.TYPE_PAGE : EntityTypes.TYPE_FOLDER;
 		final FolderContainedEntity entity;
 		try {
 			entity = service.locateFolderContainedEntity(path, entityType, siteId);
@@ -112,35 +104,16 @@ public class FolderPublisher extends BaseFolderPublisher {
 	}
 
 	public void generateLocationJson() throws TriggerProviderException {
-		String serverName;
-		Map<String, String> system = System.getenv();
-	    if (system.containsKey("COMPUTERNAME")) {
-	    	serverName = system.get("COMPUTERNAME"); // "HOSTNAME" on Unix/Linux
-	    } else try {
-	    	serverName = InetAddress.getLocalHost().getHostName();
-	    } catch (UnknownHostException e) {
-	    	throw new TriggerProviderException(e.getMessage(), e);
-	    }
-	    serverName = serverName.toLowerCase();
-		String cascadeTest = CascadeCustomProperties.getProperty(TEST_ENV_PROP_PREFIX + CASCADE_HOST_PROP_SUFFIX);
-		String cascadeProd = CascadeCustomProperties.getProperty(PROD_ENV_PROP_PREFIX + CASCADE_HOST_PROP_SUFFIX);
-		String environment = DEV_ENV_PROP_PREFIX;
-		if (serverName.startsWith(cascadeTest)) {
-			environment = TEST_ENV_PROP_PREFIX;
-		} else if (serverName.startsWith(cascadeProd)) {
-			environment = PROD_ENV_PROP_PREFIX;
-		}
-		final String nodeHostProp = environment + NODE_HOST_PROP_SUFFIX;
-		final String nodeHost = CascadeCustomProperties.getProperty(nodeHostProp);
-
+		final String serverName = getServerName();
+		final String nodeHost = getNodeJsHost(serverName);
 		LOG.info("Starting location JSON generation/publish");
-		final String uri = "https://" + nodeHost + ":8443/locations/load";
+		final String uri = nodeHost + "/locations/load";
 		String outputString = "";
 		try {
 			final URL url = new URL(uri);
-			HttpURLConnection httpConn = (HttpURLConnection)url.openConnection();
-			InputStreamReader isr = new InputStreamReader(httpConn.getInputStream());
-			BufferedReader in = new BufferedReader(isr);
+			final HttpURLConnection httpConn = (HttpURLConnection)url.openConnection();
+			final InputStreamReader isr = new InputStreamReader(httpConn.getInputStream());
+			final BufferedReader in = new BufferedReader(isr);
 			String responseString;
 			while ((responseString = in.readLine()) != null) {
 				outputString = outputString + responseString;
